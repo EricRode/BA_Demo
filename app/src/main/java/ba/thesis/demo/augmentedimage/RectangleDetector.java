@@ -5,6 +5,8 @@ import static org.opencv.imgproc.Imgproc.MORPH_OPEN;
 import static org.opencv.imgproc.Imgproc.MORPH_RECT;
 import static org.opencv.imgproc.Imgproc.THRESH_BINARY;
 import static org.opencv.imgproc.Imgproc.THRESH_OTSU;
+import static org.opencv.imgproc.Imgproc.approxPolyDP;
+import static org.opencv.imgproc.Imgproc.arcLength;
 import static org.opencv.imgproc.Imgproc.contourArea;
 import static org.opencv.imgproc.Imgproc.cvtColor;
 import static org.opencv.imgproc.Imgproc.drawContours;
@@ -23,6 +25,7 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint;
+import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
@@ -112,7 +115,12 @@ public class RectangleDetector {
         //contours2 = contours2.size() == 2 ? contours2.get(0) : contours2.get(1);
         int area_threshold = 4000;
         for (MatOfPoint c : contours2) {
-            if (contourArea(c) > area_threshold) {
+            MatOfPoint2f curve = new MatOfPoint2f(c.toArray());
+            MatOfPoint2f approxCurve = new MatOfPoint2f();
+            Imgproc.approxPolyDP(curve, approxCurve, 0.02 * Imgproc.arcLength(curve, true), true);
+            int numberVertices = (int) approxCurve.total();
+
+            if (contourArea(c) > area_threshold && numberVertices >= 4 && numberVertices <= 6) {
                 //drawContours(source, contours, b, new Scalar(255,255,255), 15);
 
                 Rect rect = Imgproc.boundingRect(c);
@@ -126,7 +134,7 @@ public class RectangleDetector {
                             (float) (planetCenter.getY() + pt.y) / 2));
 
                     //rectangle(source, rect, new Scalar(36, 255, 12));
-                    Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
+                    //Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
                     return pt;
                 }
             }

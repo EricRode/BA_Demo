@@ -54,7 +54,7 @@ import com.google.ar.core.Point;
 import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
-import com.google.ar.core.examples.java.augmentedimage.R;
+import ba.thesis.demo.augmentedimage.R;
 
 import ba.thesis.demo.augmentedimage.rendering.AugmentedImageRenderer;
 import ba.thesis.demo.common.helpers.CameraPermissionHelper;
@@ -409,7 +409,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
             }
 
-            if ((frameNumber % 90) == 0) {
+            if ((frameNumber % 10) == 0) {
                 takePic = true;
             }
             frameNumber++;
