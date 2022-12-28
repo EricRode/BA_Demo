@@ -33,7 +33,7 @@
       tools:ignore="GoogleAppIndexingWarning">
 
     <activity
-        android:name="com.google.ar.core.examples.java.augmentedimage.AugmentedImageActivity"
+        android:name="com.google.ar.core.examples.java.augmentedimage.ba.thesis.demo.augmentedimage.AugmentedImageActivity"
         android:configChanges="orientation|screenSize"
         android:exported="true"
         android:theme="@style/Theme.AppCompat.NoActionBar"
