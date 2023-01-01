@@ -51,9 +51,9 @@ public class RectangleDetector {
 
         Mat gray = new Mat();
         Mat blur = new Mat();
-        Mat th3 = new Mat();
-        Mat ero = new Mat();
-        Mat temp = new Mat();
+        //Mat th3 = new Mat();
+        //Mat ero = new Mat();
+        //Mat temp = new Mat();
 
         //Gamma Manipulation
         Mat lookUpTable = new Mat(1, 256, CvType.CV_8U);
@@ -68,19 +68,19 @@ public class RectangleDetector {
 
         //TODO hier fehlt Thresh
         Mat dst = new Mat();
-        threshold(img, dst, 177, 200, THRESH_BINARY);
+        threshold(img, dst, 181, 200, THRESH_BINARY);
 
         //convert to gray scale
         cvtColor(dst, gray, COLOR_BGR2GRAY);
         medianBlur(gray, blur, 5);
 
         //thresholding to find only white region of image, without black backgorund
-        threshold(blur, th3, 0, 255, THRESH_BINARY + THRESH_OTSU);
+        //threshold(blur, th3, 0, 255, THRESH_BINARY + THRESH_OTSU);
 
         //erosion to delete some noises
         //TODO
-        Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
-        erode(th3, ero, kernel,  new Point(-1,-1), 1);
+        //Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
+        //erode(th3, ero, kernel,  new Point(-1,-1), 1);
 
         //get threshold value only for not black pixels
         //double thresholdValue = threshold(tempThresImg, temp, 0, 255, THRESH_BINARY + THRESH_OTSU);

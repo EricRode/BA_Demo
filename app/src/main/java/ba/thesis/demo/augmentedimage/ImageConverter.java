@@ -30,13 +30,13 @@ public class ImageConverter {
 
         Bitmap bitmapImage = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
 
-        final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR", "Img" + Long.toHexString(System.currentTimeMillis()) + ".png");
+        //final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR", "Img" + Long.toHexString(System.currentTimeMillis()) + ".png");
 
         // Write it to disk. Delete later.
-        FileOutputStream fos = new FileOutputStream(out);
+        //FileOutputStream fos = new FileOutputStream(out);
         bitmapImage.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-        fos.flush();
-        fos.close();
+        //fos.flush();
+        //fos.close();
         return bitmapImage;
     }
 
