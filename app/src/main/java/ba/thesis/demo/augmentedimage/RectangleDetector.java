@@ -86,10 +86,10 @@ public class RectangleDetector {
         //double thresholdValue = threshold(tempThresImg, temp, 0, 255, THRESH_BINARY + THRESH_OTSU);
         //using otsu threshold
 
-        Mat thresh = new Mat();
+        Mat thresh = blur;
 
         //use threshold value on whole image
-        threshold(blur, thresh, 20, 255, THRESH_BINARY);
+        //threshold(blur, thresh, 20, 255, THRESH_BINARY);
 
         List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchyOutputVector = new Mat();

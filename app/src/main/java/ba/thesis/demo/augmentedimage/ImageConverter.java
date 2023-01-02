@@ -34,7 +34,7 @@ public class ImageConverter {
 
         // Write it to disk. Delete later.
         //FileOutputStream fos = new FileOutputStream(out);
-        bitmapImage.compress(Bitmap.CompressFormat.JPEG, 100, fos);
+        //bitmapImage.compress(Bitmap.CompressFormat.JPEG, 100, fos);
         //fos.flush();
         //fos.close();
         return bitmapImage;
