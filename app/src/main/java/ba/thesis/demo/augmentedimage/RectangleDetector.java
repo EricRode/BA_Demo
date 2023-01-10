@@ -51,77 +51,52 @@ public class RectangleDetector {
 
         Mat gray = new Mat();
         Mat blur = new Mat();
-        //Mat th3 = new Mat();
-        //Mat ero = new Mat();
-        //Mat temp = new Mat();
+        Mat gammaCorrection = new Mat();
+
+        cvtColor(source, gray, COLOR_BGR2GRAY);
 
         //Gamma Manipulation
         Mat lookUpTable = new Mat(1, 256, CvType.CV_8U);
-        double gammaValue= 0.8;
+        double gammaValue = 2.0;
         byte[] lookUpTableData = new byte[(int) (lookUpTable.total()*lookUpTable.channels())];
         for (int i = 0; i < lookUpTable.cols(); i++) {
             lookUpTableData[i] = saturate(Math.pow(i / 255.0, gammaValue) * 255.0);
         }
         lookUpTable.put(0, 0, lookUpTableData);
-        Mat img = new Mat();
-        Core.LUT(source, lookUpTable, img);
+        Core.LUT(gray, lookUpTable, gammaCorrection);
 
-        //TODO hier fehlt Thresh
-        Mat dst = new Mat();
-        threshold(img, dst, 181, 200, THRESH_BINARY);
+        Mat threshold = new Mat();
+        threshold(gammaCorrection, threshold, 0, 255, THRESH_OTSU);
 
         //convert to gray scale
-        cvtColor(dst, gray, COLOR_BGR2GRAY);
-        medianBlur(gray, blur, 5);
-
-        //thresholding to find only white region of image, without black backgorund
-        //threshold(blur, th3, 0, 255, THRESH_BINARY + THRESH_OTSU);
-
-        //erosion to delete some noises
-        //TODO
-        //Mat kernel = Mat.ones(5, 5, CvType.CV_8U);
-        //erode(th3, ero, kernel,  new Point(-1,-1), 1);
-
-        //get threshold value only for not black pixels
-        //double thresholdValue = threshold(tempThresImg, temp, 0, 255, THRESH_BINARY + THRESH_OTSU);
-        //using otsu threshold
-
-        Mat thresh = blur;
-
-        //use threshold value on whole image
-        //threshold(blur, thresh, 20, 255, THRESH_BINARY);
+        medianBlur(threshold, blur, 5);
 
         List<MatOfPoint> contours = new ArrayList<>();
         Mat hierarchyOutputVector = new Mat();
 
         //System.out.println("ThresholdValue: " + thresholdValue);
-        Imgproc.findContours(thresh, contours, hierarchyOutputVector, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
+        Imgproc.findContours(blur, contours, hierarchyOutputVector, Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
 
         // paint whole contour
-        drawContours(thresh, contours, -1, new Scalar(255,255,255), -1);
+        drawContours(blur, contours, -1, new Scalar(255,255,255), -1);
 
         // Morph open
-        Mat kernel2 = getStructuringElement(MORPH_RECT, new Size(9,9));
+        Mat kernel = getStructuringElement(MORPH_RECT, new Size(18,18));
         Mat opening = new Mat();
 
-        morphologyEx(thresh, opening, MORPH_OPEN, kernel2, new Point(-1,-1), 4);
-
-
-        //imgCanny = Canny(opening, 137, 200);
+        morphologyEx(blur, opening, MORPH_OPEN, kernel, new Point(-1,-1), 8);
 
         List<MatOfPoint> contours2 = new ArrayList<>();
-        //Draw rectangles, the 'area_threshold' value was determined empirically
         Imgproc.findContours(opening, contours2, hierarchyOutputVector,  Imgproc.RETR_EXTERNAL, Imgproc.CHAIN_APPROX_SIMPLE);
-        //contours2 = contours2.size() == 2 ? contours2.get(0) : contours2.get(1);
-        int area_threshold = 4000;
+
+        int area_threshold = 40000;
         for (MatOfPoint c : contours2) {
             MatOfPoint2f curve = new MatOfPoint2f(c.toArray());
             MatOfPoint2f approxCurve = new MatOfPoint2f();
             Imgproc.approxPolyDP(curve, approxCurve, 0.02 * Imgproc.arcLength(curve, true), true);
             int numberVertices = (int) approxCurve.total();
 
-            if (contourArea(c) > area_threshold && numberVertices >= 4 && numberVertices <= 6) {
-                //drawContours(source, contours, b, new Scalar(255,255,255), 15);
+            if (contourArea(c) > area_threshold && numberVertices >= 4 && numberVertices <= 5) {
 
                 Rect rect = Imgproc.boundingRect(c);
 
@@ -133,8 +108,8 @@ public class RectangleDetector {
                     setLabel(source, "O", new CenterPoint((float) (planetCenter.getX() + pt.x) / 2,
                             (float) (planetCenter.getY() + pt.y) / 2));
 
-                    //rectangle(source, rect, new Scalar(36, 255, 12));
-                    //Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
+                    rectangle(source, rect, new Scalar(255, 255, 255));
+                    Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
                     return pt;
                 }
             }
