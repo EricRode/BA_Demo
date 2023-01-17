@@ -109,7 +109,7 @@ public class RectangleDetector {
                             (float) (planetCenter.getY() + pt.y) / 2));
 
                     rectangle(source, rect, new Scalar(255, 255, 255));
-                    Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
+                    // Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
                     return pt;
                 }
             }

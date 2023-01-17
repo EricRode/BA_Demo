@@ -79,6 +79,7 @@ import org.opencv.android.OpenCVLoader;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -137,6 +138,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private CenterPoint planetCenter = null;
     private CenterPoint rectangleCenter = null;
     private int frameNumber = 0;
+    private int frameNumberPlaneFound = 0;
+    private boolean firstFound = false;
 
     private String text = "";
     private Button mButton;
@@ -382,7 +385,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
             if (planetFound) {
                 org.opencv.core.Point pt = new RectangleDetector().detectRectangle(currentBitmap, planetCenter);
-                messageSnackbarHelper.showMessage(this, "rect");
+                messageSnackbarHelper.showMessage(this, "search_rect");
                 if (pt != null) {
                     rectangleCenter = new CenterPoint((float) pt.x, (float) pt.y);
                     System.out.println("rectangle " + rectangleCenter);
@@ -402,6 +405,12 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
                 // TODO für Punkt Berechnung evtl. Achsen tauschen mit image.width und height berechenbar
                 handleFoundWord(frame, camera, midX, midY, planet);
+
+                if (!firstFound) {
+                    firstFound = true;
+                    float i = frameNumberPlaneFound / 30.0f;
+                    writeToFile(i + " s");
+                }
             }
 
 
@@ -413,6 +422,10 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 takePic = true;
             }
             frameNumber++;
+            if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
+                frameNumberPlaneFound++;
+            }
+
         } catch (Throwable t) {
             // Avoid crashing the application due to unhandled exceptions.
             Log.e(TAG, "Exception on the OpenGL thread", t);
@@ -436,7 +449,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             return;
         }
 
-        final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/HelloAR", "TXT" + Long.toHexString(System.currentTimeMillis()) + ".txt");
+        final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/HelloAR", "OpenCV_" + Long.toHexString(System.currentTimeMillis()) + ".txt");
 
         File path = new File(Environment.getExternalStoragePublicDirectory(
                 Environment.DIRECTORY_DOCUMENTS) + "/HelloAR");
@@ -462,19 +475,15 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             return;
         }
 
-        final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/HelloAR", "TXT" + Long.toHexString(System.currentTimeMillis()) + ".txt");
-
         File path = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS) + "/HelloAR");
+                Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo");
         try {
             path.mkdir();
             // Write it to disk.
-            FileOutputStream fos = new FileOutputStream(out);
-
-            fos.write(string.getBytes());
-            fos.flush();
-            fos.close();
-            System.out.println("Write successful");
+            File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "TXT" + planet + ".txt");
+            FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
+            fr.write("\n" + string);
+            fr.close();
 
         } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
@@ -514,13 +523,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         Tuple result = processTextRecognitionResult(texts);
 
                         if (result != null) {
-
-                            int imageWidth = inputImage.getWidth();
-                            int imageHeight = inputImage.getHeight();
-
-                            float rotatedY = result.getRect().exactCenterX();
-                            float rotatedYX= result.getRect().exactCenterY();
-
                             planetCenter = new CenterPoint(result.getRect().exactCenterX(), result.getRect().exactCenterY());
                             planet = result.getPlanet();
                             planetFound = true;
@@ -547,7 +549,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
 
         boolean signHeadlineFound = false;
-        boolean planetFound = false;
         Tuple result = null;
 
         for (int i = 0; i < blocks.size(); i++) {
