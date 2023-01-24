@@ -121,6 +121,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private DisplayRotationHelper displayRotationHelper;
     private final TrackingStateHelper trackingStateHelper = new TrackingStateHelper(this);
 
+    private int displayWidth;
+    private int displayHeight;
+
     private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
     private final AugmentedImageRenderer augmentedImageRenderer = new AugmentedImageRenderer();
 
@@ -155,6 +158,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         surfaceView = findViewById(R.id.surfaceview);
         displayRotationHelper = new DisplayRotationHelper(/*context=*/ this);
 
+        surfaceView.getWidth();
         mButton = findViewById(R.id.button);
 
         // Set up renderer.
@@ -186,10 +190,14 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
 
         installRequested = false;
+
+        displayWidth = surfaceView.getWidth();
+        displayHeight = surfaceView.getHeight();
     }
 
     public void takePic() {
-        takePic = true;
+        firstFound = false;
+        frameNumberPlaneFound = 0;
     }
 
     @Override
@@ -377,6 +385,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 // get jpeg bitmap from YUV image
                 currentBitmap = getBitmap(image);
 
+                System.out.println("currentBitmap:" + currentBitmap.getWidth() + "x" + currentBitmap.getHeight());
+
                 // analyse text in image
                 runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
 
@@ -403,8 +413,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 float midX = (planetCenter.getX() + rectangleCenter.getX()) / 2;
                 float midY = (planetCenter.getY() + rectangleCenter.getY()) / 2;
 
-                // TODO für Punkt Berechnung evtl. Achsen tauschen mit image.width und height berechenbar
-                handleFoundWord(frame, camera, midX, midY, planet);
+                // TODO
+                handleFoundWord(frame, camera, 800, 1800, planet);
 
                 if (!firstFound) {
                     firstFound = true;
@@ -482,7 +492,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             // Write it to disk.
             File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "TXT" + planet + ".txt");
             FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
-            fr.write("\n" + string);
+            fr.write("\n" + string + " width=" + currentBitmap.getWidth()+ " height=" + currentBitmap.getHeight());
             fr.close();
 
         } catch (IOException e) {
@@ -523,7 +533,10 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         Tuple result = processTextRecognitionResult(texts);
 
                         if (result != null) {
-                            planetCenter = new CenterPoint(result.getRect().exactCenterX(), result.getRect().exactCenterY());
+                            planetCenter = new CenterPoint(result.getRect().exactCenterY(), currentBitmap.getHeight() - result.getRect().exactCenterX());
+                            //planetCenter = new CenterPoint(result.getRect().exactCenterX(), result.getRect().exactCenterY());
+                            System.out.println("planet:"+planetCenter.getX() + " " + planetCenter.getY());
+                            writeToFile("display:"+ surfaceView.getWidth() + "x" + surfaceView.getHeight());
                             planet = result.getPlanet();
                             planetFound = true;
                         }

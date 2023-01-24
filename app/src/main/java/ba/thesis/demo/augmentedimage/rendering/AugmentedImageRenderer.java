@@ -131,7 +131,7 @@ public class AugmentedImageRenderer {
         mercuryRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "VENUS":
-        venusRenderer.updateModelMatrix(modelMatrix, 0.1F); // This line relies on a change in ObjectRenderer.updateModelMatrix later in this codelab.
+        venusRenderer.updateModelMatrix(modelMatrix, 0.01F); // This line relies on a change in ObjectRenderer.updateModelMatrix later in this codelab.
         venusRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "ERDE":

@@ -51,11 +51,11 @@ public class RectangleDetector {
 
         Mat gray = new Mat();
         Mat blur = new Mat();
-        Mat gammaCorrection = new Mat();
+        //Mat gammaCorrection = new Mat();
 
         cvtColor(source, gray, COLOR_BGR2GRAY);
 
-        //Gamma Manipulation
+       /* //Gamma Manipulation
         Mat lookUpTable = new Mat(1, 256, CvType.CV_8U);
         double gammaValue = 2.0;
         byte[] lookUpTableData = new byte[(int) (lookUpTable.total()*lookUpTable.channels())];
@@ -63,10 +63,10 @@ public class RectangleDetector {
             lookUpTableData[i] = saturate(Math.pow(i / 255.0, gammaValue) * 255.0);
         }
         lookUpTable.put(0, 0, lookUpTableData);
-        Core.LUT(gray, lookUpTable, gammaCorrection);
+        Core.LUT(gray, lookUpTable, gammaCorrection);*/
 
         Mat threshold = new Mat();
-        threshold(gammaCorrection, threshold, 0, 255, THRESH_OTSU);
+        threshold(gray, threshold, 0, 255, THRESH_OTSU);
 
         //convert to gray scale
         medianBlur(threshold, blur, 5);
@@ -103,13 +103,16 @@ public class RectangleDetector {
                 if (rect.contains(new Point(planetCenter.getX(), planetCenter.getY()))) {
                     Point pt = new Point(rect.x + ((float)(rect.width) / 2),rect.y + ((float)(rect.height) / 2));
 
-                    setLabel(source, "X", c);
-                    setLabel(source, "y", planetCenter);
-                    setLabel(source, "O", new CenterPoint((float) (planetCenter.getX() + pt.x) / 2,
-                            (float) (planetCenter.getY() + pt.y) / 2));
+                    //setLabel(source, "X", c);
+                    setLabel(source, "20x20", new CenterPoint(20,20));
+                    setLabel(source, "470x470", new CenterPoint(470,470));
+                    setLabel(source, "600x470", new CenterPoint(600,470));
+                    setLabel(source, "100x300", new CenterPoint(100,300));
+                    setLabel(source, "D", planetCenter);
+                    //setLabel(source, "O", new CenterPoint((float) (planetCenter.getX() + pt.x) / 2,(float) (planetCenter.getY() + pt.y) / 2));
 
                     rectangle(source, rect, new Scalar(255, 255, 255));
-                    // Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
+                    Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
                     return pt;
                 }
             }
