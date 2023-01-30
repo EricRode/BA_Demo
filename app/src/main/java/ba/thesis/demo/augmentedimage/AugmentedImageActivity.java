@@ -410,11 +410,15 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 rectangleFound = false;
                 messageSnackbarHelper.showMessage(this, "rect: " + rectangleCenter + "  text: " + planetCenter);
 
-                float midX = (planetCenter.getX() + rectangleCenter.getX()) / 2;
-                float midY = (planetCenter.getY() + rectangleCenter.getY()) / 2;
+                float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
 
-                // TODO
-                handleFoundWord(frame, camera, 800, 1800, planet);
+                float x = currentBitmap.getHeight() - rectangleCenter.getY();
+                float y = rectangleCenter.getX();
+
+                float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth())/2);
+                float yD = y * scaleFactor;
+
+                handleFoundWord(frame, camera, xD, yD, planet);
 
                 if (!firstFound) {
                     firstFound = true;
@@ -533,10 +537,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         Tuple result = processTextRecognitionResult(texts);
 
                         if (result != null) {
-                            planetCenter = new CenterPoint(result.getRect().exactCenterY(), currentBitmap.getHeight() - result.getRect().exactCenterX());
-                            //planetCenter = new CenterPoint(result.getRect().exactCenterX(), result.getRect().exactCenterY());
-                            System.out.println("planet:"+planetCenter.getX() + " " + planetCenter.getY());
-                            writeToFile("display:"+ surfaceView.getWidth() + "x" + surfaceView.getHeight());
+                            planetCenter = new CenterPoint(result.getRect().exactCenterY(),
+                                    currentBitmap.getHeight() - result.getRect().exactCenterX());
                             planet = result.getPlanet();
                             planetFound = true;
                         }

@@ -104,11 +104,7 @@ public class RectangleDetector {
                     Point pt = new Point(rect.x + ((float)(rect.width) / 2),rect.y + ((float)(rect.height) / 2));
 
                     //setLabel(source, "X", c);
-                    setLabel(source, "20x20", new CenterPoint(20,20));
-                    setLabel(source, "470x470", new CenterPoint(470,470));
-                    setLabel(source, "600x470", new CenterPoint(600,470));
-                    setLabel(source, "100x300", new CenterPoint(100,300));
-                    setLabel(source, "D", planetCenter);
+                    //setLabel(source, "D", planetCenter);
                     //setLabel(source, "O", new CenterPoint((float) (planetCenter.getX() + pt.x) / 2,(float) (planetCenter.getY() + pt.y) / 2));
 
                     rectangle(source, rect, new Scalar(255, 255, 255));
@@ -128,7 +124,6 @@ public class RectangleDetector {
         Size text = Imgproc.getTextSize(label, fontface, scale, thickness, baseline);
         Rect r = Imgproc.boundingRect(contour);
         Point pt = new Point(r.x + ((r.width - text.width) / 2),r.y + ((r.height + text.height) / 2));
-
         Imgproc.putText(im, label, pt, fontface, scale, new Scalar(255, 0, 0), thickness);
     }
 
