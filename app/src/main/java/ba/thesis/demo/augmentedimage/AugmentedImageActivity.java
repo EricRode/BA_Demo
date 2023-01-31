@@ -163,6 +163,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private int frameNumberPlaneFound = 0;
     private boolean firstFound = false;
 
+    long startTimestamp = 0;
+
     private String text = "";
     private Button mButton;
     private boolean planetFound = false;
@@ -302,6 +304,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         displayRotationHelper.onResume();
 
         fitToScanView.setVisibility(View.VISIBLE);
+
+        startTimestamp = System.currentTimeMillis();
     }
 
     @Override
@@ -450,8 +454,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     if (!firstFound) {
                         firstFound = true;
                         //scanRythm = 60;
-                        float i = frameNumber / 30.0f;
-                        writeToFile(i + "");
+                        writeToFile((System.currentTimeMillis() - startTimestamp) + "");
                     }
                 }
 
@@ -498,7 +501,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         try {
             path.mkdir();
             // Write it to disk.
-            File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "TXT" + planet + ".txt");
+            File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "Own" + planet + ".txt");
             FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
             fr.write("\n" + string);
             fr.close();
