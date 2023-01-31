@@ -148,6 +148,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     private boolean takePic = false;
 
+    private int scanRythm = 15;
+
     // Augmented image configuration and rendering.
     // Load a single image (true) or a pre-generated image database (false).
     private final boolean useSingleImage = false;
@@ -195,7 +197,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         mButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                
+
                 //TODO hier zurücksetzten von Anchor
 
                 takePic();
@@ -368,7 +370,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         if (cpuResolution == ImageResolution.LOW_RESOLUTION && cpuMediumResolutionCameraConfig != null) {
             onCameraConfigChanged(cpuMediumResolutionCameraConfig);
             cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
-            System.out.println("FUUUCK");
         }
 
 
@@ -402,17 +403,14 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 final float[] colorCorrectionRgba = new float[4];
                 frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
 
-                // TODO hasTackingPlane() evtl. falsch
-                // if (takePic && hasTrackingPlane()) {
                 if (takePic) {
                     takePic = false;
 
                     // get image from current frame
                     Image image = frame.acquireCameraImage();
+
                     // get jpeg bitmap from YUV image
                     currentBitmap = getBitmap(image);
-
-                    System.out.println("currentBitmap:" + currentBitmap.getWidth() + "x" + currentBitmap.getHeight());
 
                     // analyse text in image
                     runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
@@ -420,14 +418,15 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     image.close();
                 }
 
+                // if text was found
                 if (planetFound) {
                     org.opencv.core.Point pt = new RectangleDetector().detectRectangle(currentBitmap, planetCenter);
                     messageSnackbarHelper.showMessage(this, "search_rect");
                     if (pt != null) {
                         rectangleCenter = new CenterPoint((float) pt.x, (float) pt.y);
-                        System.out.println("rectangle " + rectangleCenter);
                         rectangleFound = true;
                     } else {
+                        // In case rectangle was not detected in current image
                         planetFound = false;
                     }
                 }
@@ -435,7 +434,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 if (planetFound && rectangleFound) {
                     planetFound = false;
                     rectangleFound = false;
-                    messageSnackbarHelper.showMessage(this, "rect: " + rectangleCenter + "  text: " + planetCenter);
+                    messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
                     float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
 
@@ -445,12 +444,14 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
                     float yD = y * scaleFactor;
 
+                    // hitTest with center of rectangle coordinates
                     handleFoundWord(frame, camera, xD, yD, planet);
 
                     if (!firstFound) {
                         firstFound = true;
-                        float i = frameNumberPlaneFound / 30.0f;
-                        writeToFile(i + " s");
+                        //scanRythm = 60;
+                        float i = frameNumber / 30.0f;
+                        writeToFile(i + "");
                     }
                 }
 
@@ -459,13 +460,14 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
                 }
 
-                if ((frameNumber % 20) == 0 && frameNumber > 10) {
+                // start new scan
+                if ((frameNumber % scanRythm) == 0) {
                     takePic = true;
                 }
                 frameNumber++;
-                if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
+                /*if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
                     frameNumberPlaneFound++;
-                }
+                }*/
 
             } catch (Throwable t) {
                 // Avoid crashing the application due to unhandled exceptions.
@@ -486,7 +488,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     }
 
     private void writeToFile(String string) {
-
         if (string.equals("")) {
             System.out.println("Text is empty");
             return;
@@ -499,12 +500,11 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             // Write it to disk.
             File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "TXT" + planet + ".txt");
             FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
-            fr.write("\n" + string + " width=" + currentBitmap.getWidth()+ " height=" + currentBitmap.getHeight());
+            fr.write("\n" + string);
             fr.close();
 
         } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
-            System.out.println("Fehler beim schreiben");
         }
     }
 
@@ -522,7 +522,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             return;
         }
 
-        System.out.println("draw planet earth");
         augmentedImageRenderer.drawPlanet(
                 viewmtx, projmtx, wrappedAnchor.getAnchor(), colorCorrectionRgba, wrappedAnchor.getPlanetName());
     }
@@ -530,7 +529,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     /// Text recognition
     private void runTextRecognition(InputImage inputImage) {
         TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
-        takePic = false;
 
         recognizer.process(inputImage).addOnSuccessListener(
                 new OnSuccessListener<Text>() {
@@ -540,6 +538,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         Tuple result = processTextRecognitionResult(texts);
 
                         if (result != null) {
+                            // rotate by 90 degrees counterclockwise
                             planetCenter = new CenterPoint(result.getRect().exactCenterY(),
                                     currentBitmap.getHeight() - result.getRect().exactCenterX());
                             planet = result.getPlanet();
@@ -552,7 +551,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                             @Override
                             public void onFailure(@NonNull Exception e) {
                                 // Task failed with an exception
-                                System.out.println("FAIL!!!");
                                 System.out.println(e.getMessage());
                                 e.printStackTrace();
                             }
@@ -576,7 +574,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 if (findSimilarity(lines.get(j).getText(), "Planetenwanderweg Karlsaue") > 0.5) {
                     signHeadlineFound = true;
                 }
-                //TODO else continue;
                 for (int k = 0; k < elements.size(); k++) {
                     for (String planet: planets) {
                         if (elements.get(k).getText().contains(planet)) {
@@ -648,14 +645,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private void handleFoundWord(Frame frame, Camera camera, float x, float y, String planet) {
 
         if (camera.getTrackingState() == TrackingState.TRACKING) {
-            //TODO vielleicht muss man Werte tauschen bzw. verrechnen
             List<HitResult> hitResultList = frame.hitTest(x, y);
-            /*if (hitResultList.isEmpty()) {
-                System.out.println("No hit");
-            } else {
-                System.out.println("Hit");
-
-            }*/
             for (HitResult hit : hitResultList) {
                 // If any plane, Oriented Point, or Instant Placement Point was hit, create an anchor.
                 Trackable trackable = hit.getTrackable();

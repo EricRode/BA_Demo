@@ -40,7 +40,6 @@ public class ImageConverter {
         return bitmapImage;
     }
 
-    // TODO Quelle
     public static byte[] toJpegImage(Image image) {
         if (image.getFormat() != ImageFormat.YUV_420_888) {
             throw new IllegalArgumentException("Invalid image format");
@@ -94,7 +93,6 @@ public class ImageConverter {
         return result;
     }
 
-    // TODO Quelle
     public static YuvImage toYuvImage(Image image) {
         if (image.getFormat() != ImageFormat.YUV_420_888) {
             throw new IllegalArgumentException("Invalid image format");

@@ -102,8 +102,8 @@ public class RectangleDetector {
                     //setLabel(source, "D", planetCenter);
                     //setLabel(source, "O", new CenterPoint((float) (planetCenter.getX() + pt.x) / 2,(float) (planetCenter.getY() + pt.y) / 2));
 
-                    rectangle(source, rect, new Scalar(255, 255, 255));
-                    Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
+                    //rectangle(source, rect, new Scalar(255, 255, 255));
+                    //Imgcodecs.imwrite(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR/" + "Rectangle" + Long.toHexString(System.currentTimeMillis()) + ".png", source);
                     return pt;
                 }
             }
