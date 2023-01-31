@@ -28,6 +28,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.util.Pair;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -44,6 +45,8 @@ import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Camera;
+import com.google.ar.core.CameraConfig;
+import com.google.ar.core.CameraConfigFilter;
 import com.google.ar.core.Config;
 import com.google.ar.core.DepthPoint;
 import com.google.ar.core.Frame;
@@ -83,6 +86,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -105,9 +110,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     public static final ArrayList<String> planets = new ArrayList(Arrays.asList("SONNE", "MERKUR",
             "VENUS", "ERDE", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUN"));
 
-    private static final String SEARCHING_PLANE_MESSAGE = "Oberflächen werden gesucht...";
-    private static final String NO_SIGN_FOUND_MESSAGE = "Kein Schild gefunden...";
-
     // Rendering. The Renderers are created here, and initialized when the GL surface is created.
     private GLSurfaceView surfaceView;
     private ImageView fitToScanView;
@@ -116,13 +118,28 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     private boolean installRequested;
 
+
     private Session session;
     private final SnackbarHelper messageSnackbarHelper = new SnackbarHelper();
     private DisplayRotationHelper displayRotationHelper;
     private final TrackingStateHelper trackingStateHelper = new TrackingStateHelper(this);
 
-    private int displayWidth;
-    private int displayHeight;
+    private enum ImageResolution {
+        LOW_RESOLUTION,
+        MEDIUM_RESOLUTION,
+        HIGH_RESOLUTION,
+    }
+
+    private ImageResolution cpuResolution = ImageResolution.LOW_RESOLUTION;
+
+    // This lock prevents changing resolution as the frame is being rendered. ARCore requires all
+    // CPU images to be released before changing resolution.
+    private final Object frameImageInUseLock = new Object();
+
+    // For Camera Configuration APIs usage.
+    private CameraConfig cpuLowResolutionCameraConfig;
+    private CameraConfig cpuMediumResolutionCameraConfig;
+    private CameraConfig cpuHighResolutionCameraConfig;
 
     private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
     private final AugmentedImageRenderer augmentedImageRenderer = new AugmentedImageRenderer();
@@ -178,6 +195,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         mButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                
+                //TODO hier zurücksetzten von Anchor
+
                 takePic();
             }
         });
@@ -190,9 +210,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
 
         installRequested = false;
-
-        displayWidth = surfaceView.getWidth();
-        displayHeight = surfaceView.getHeight();
     }
 
     public void takePic() {
@@ -277,6 +294,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             session = null;
             return;
         }
+
+        obtainCameraConfigs();
         surfaceView.onResume();
         displayRotationHelper.onResume();
 
@@ -345,104 +364,113 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         if (session == null) {
             return;
         }
+
+        if (cpuResolution == ImageResolution.LOW_RESOLUTION && cpuMediumResolutionCameraConfig != null) {
+            onCameraConfigChanged(cpuMediumResolutionCameraConfig);
+            cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
+            System.out.println("FUUUCK");
+        }
+
+
         // Notify ARCore session that the view size changed so that the perspective matrix and
         // the video background can be properly adjusted.
         displayRotationHelper.updateSessionIfNeeded(session);
+        synchronized (frameImageInUseLock) {
+            try {
+                session.setCameraTextureName(backgroundRenderer.getTextureId());
+                // Obtain the current frame from ARSession. When the configuration is set to
+                // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
+                // camera framerate.
+                Frame frame = session.update();
+                Camera camera = frame.getCamera();
 
-        try {
-            session.setCameraTextureName(backgroundRenderer.getTextureId());
-            // Obtain the current frame from ARSession. When the configuration is set to
-            // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
-            // camera framerate.
-            Frame frame = session.update();
-            Camera camera = frame.getCamera();
+                // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
+                trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
 
-            // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
-            trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
+                // If frame is ready, render camera preview image to the GL surface.
+                backgroundRenderer.draw(frame);
 
-            // If frame is ready, render camera preview image to the GL surface.
-            backgroundRenderer.draw(frame);
+                // Get projection matrix.
+                float[] projmtx = new float[16];
+                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
 
-            // Get projection matrix.
-            float[] projmtx = new float[16];
-            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
+                // Get camera matrix and draw.
+                float[] viewmtx = new float[16];
+                camera.getViewMatrix(viewmtx, 0);
 
-            // Get camera matrix and draw.
-            float[] viewmtx = new float[16];
-            camera.getViewMatrix(viewmtx, 0);
+                // Compute lighting from average intensity of the image.
+                final float[] colorCorrectionRgba = new float[4];
+                frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
 
-            // Compute lighting from average intensity of the image.
-            final float[] colorCorrectionRgba = new float[4];
-            frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
+                // TODO hasTackingPlane() evtl. falsch
+                // if (takePic && hasTrackingPlane()) {
+                if (takePic) {
+                    takePic = false;
 
-            // TODO hasTackingPlane() evtl. falsch
-           // if (takePic && hasTrackingPlane()) {
-            if (takePic) {
-                takePic = false;
+                    // get image from current frame
+                    Image image = frame.acquireCameraImage();
+                    // get jpeg bitmap from YUV image
+                    currentBitmap = getBitmap(image);
 
-                // get image from current frame
-                Image image = frame.acquireCameraImage();
-                // get jpeg bitmap from YUV image
-                currentBitmap = getBitmap(image);
+                    System.out.println("currentBitmap:" + currentBitmap.getWidth() + "x" + currentBitmap.getHeight());
 
-                System.out.println("currentBitmap:" + currentBitmap.getWidth() + "x" + currentBitmap.getHeight());
+                    // analyse text in image
+                    runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
 
-                // analyse text in image
-                runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
+                    image.close();
+                }
 
-                image.close();
-            }
+                if (planetFound) {
+                    org.opencv.core.Point pt = new RectangleDetector().detectRectangle(currentBitmap, planetCenter);
+                    messageSnackbarHelper.showMessage(this, "search_rect");
+                    if (pt != null) {
+                        rectangleCenter = new CenterPoint((float) pt.x, (float) pt.y);
+                        System.out.println("rectangle " + rectangleCenter);
+                        rectangleFound = true;
+                    } else {
+                        planetFound = false;
+                    }
+                }
 
-            if (planetFound) {
-                org.opencv.core.Point pt = new RectangleDetector().detectRectangle(currentBitmap, planetCenter);
-                messageSnackbarHelper.showMessage(this, "search_rect");
-                if (pt != null) {
-                    rectangleCenter = new CenterPoint((float) pt.x, (float) pt.y);
-                    System.out.println("rectangle " + rectangleCenter);
-                    rectangleFound = true;
-                } else {
+                if (planetFound && rectangleFound) {
                     planetFound = false;
+                    rectangleFound = false;
+                    messageSnackbarHelper.showMessage(this, "rect: " + rectangleCenter + "  text: " + planetCenter);
+
+                    float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
+
+                    float x = currentBitmap.getHeight() - rectangleCenter.getY();
+                    float y = rectangleCenter.getX();
+
+                    float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
+                    float yD = y * scaleFactor;
+
+                    handleFoundWord(frame, camera, xD, yD, planet);
+
+                    if (!firstFound) {
+                        firstFound = true;
+                        float i = frameNumberPlaneFound / 30.0f;
+                        writeToFile(i + " s");
+                    }
                 }
-            }
 
-            if (planetFound && rectangleFound) {
-                planetFound = false;
-                rectangleFound = false;
-                messageSnackbarHelper.showMessage(this, "rect: " + rectangleCenter + "  text: " + planetCenter);
 
-                float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
-
-                float x = currentBitmap.getHeight() - rectangleCenter.getY();
-                float y = rectangleCenter.getX();
-
-                float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth())/2);
-                float yD = y * scaleFactor;
-
-                handleFoundWord(frame, camera, xD, yD, planet);
-
-                if (!firstFound) {
-                    firstFound = true;
-                    float i = frameNumberPlaneFound / 30.0f;
-                    writeToFile(i + " s");
+                if (wrappedAnchor != null) {
+                    drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
                 }
-            }
 
+                if ((frameNumber % 20) == 0 && frameNumber > 10) {
+                    takePic = true;
+                }
+                frameNumber++;
+                if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
+                    frameNumberPlaneFound++;
+                }
 
-            if (wrappedAnchor != null) {
-                drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
+            } catch (Throwable t) {
+                // Avoid crashing the application due to unhandled exceptions.
+                Log.e(TAG, "Exception on the OpenGL thread", t);
             }
-
-            if ((frameNumber % 10) == 0) {
-                takePic = true;
-            }
-            frameNumber++;
-            if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
-                frameNumberPlaneFound++;
-            }
-
-        } catch (Throwable t) {
-            // Avoid crashing the application due to unhandled exceptions.
-            Log.e(TAG, "Exception on the OpenGL thread", t);
         }
     }
 
@@ -455,31 +483,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             }
         }
         return false;
-    }
-
-    private void writeToFile() {
-
-        if (text.equals("")) {
-            return;
-        }
-
-        final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/HelloAR", "OpenCV_" + Long.toHexString(System.currentTimeMillis()) + ".txt");
-
-        File path = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS) + "/HelloAR");
-        try {
-            path.mkdir();
-            // Write it to disk.
-            FileOutputStream fos = new FileOutputStream(out);
-
-            fos.write(text.getBytes());
-            fos.flush();
-            fos.close();
-            System.out.println("Write successful");
-
-        } catch (IOException e) {
-            Log.e("Exception", "File write failed: " + e.toString());
-        }
     }
 
     private void writeToFile(String string) {
@@ -684,6 +687,80 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 }
             }
         }
+    }
+
+
+    /// Resolution stuff
+    private void onCameraConfigChanged(CameraConfig cameraConfig) {
+        // To change the AR camera config - first we pause the AR session, set the desired camera
+        // config and then resume the AR session.
+        if (session != null) {
+            // Block here if the image is still being used.
+            synchronized (frameImageInUseLock) {
+                session.pause();
+                session.setCameraConfig(cameraConfig);
+                session.setCameraConfig(cameraConfig);
+                try {
+                    session.resume();
+                } catch (CameraNotAvailableException ex) {
+                    messageSnackbarHelper.showError(this, "Camera not available. Try restarting the app.");
+                    session = null;
+                }
+            }
+        }
+    }
+
+    // Obtains the supported camera configs and build the list of radio button one for each camera
+    // config.
+    private void obtainCameraConfigs() {
+        // First obtain the session handle before getting the list of various camera configs.
+        if (session != null) {
+            // Create filter here with desired fps filters.
+            CameraConfigFilter cameraConfigFilter =
+                    new CameraConfigFilter(session)
+                            .setTargetFps(
+                                    EnumSet.of(
+                                            CameraConfig.TargetFps.TARGET_FPS_30, CameraConfig.TargetFps.TARGET_FPS_60));
+            List<CameraConfig> cameraConfigs = session.getSupportedCameraConfigs(cameraConfigFilter);
+            Log.i(TAG, "Size of supported CameraConfigs list is " + cameraConfigs.size());
+
+            // Determine the highest and lowest CPU resolutions.
+            cpuLowResolutionCameraConfig =
+                    getCameraConfigWithSelectedResolution(
+                            cameraConfigs, /*ImageResolution*/ ImageResolution.LOW_RESOLUTION);
+            cpuMediumResolutionCameraConfig =
+                    getCameraConfigWithSelectedResolution(
+                            cameraConfigs, /*ImageResolution*/ ImageResolution.MEDIUM_RESOLUTION);
+            cpuHighResolutionCameraConfig =
+                    getCameraConfigWithSelectedResolution(
+                            cameraConfigs, /*ImageResolution*/ ImageResolution.HIGH_RESOLUTION);
+        }
+    }
+    /* Get the CameraConfig with selected resolution. */
+    private static CameraConfig getCameraConfigWithSelectedResolution(
+            List<CameraConfig> cameraConfigs, ImageResolution resolution) {
+        // Take the first three camera configs, if camera configs size are larger than 3.
+        List<CameraConfig> cameraConfigsByResolution =
+                new ArrayList<>(
+                        cameraConfigs.subList(0, Math.min(cameraConfigs.size(), 3)));
+        Collections.sort(
+                cameraConfigsByResolution,
+                (CameraConfig p1, CameraConfig p2) ->
+                        Integer.compare(p1.getImageSize().getHeight(), p2.getImageSize().getHeight()));
+        CameraConfig cameraConfig = cameraConfigsByResolution.get(0);
+        switch (resolution) {
+            case LOW_RESOLUTION:
+                cameraConfig = cameraConfigsByResolution.get(0);
+                break;
+            case MEDIUM_RESOLUTION:
+                // There are some devices that medium resolution is the same as high resolution.
+                cameraConfig = cameraConfigsByResolution.get(1);
+                break;
+            case HIGH_RESOLUTION:
+                cameraConfig = cameraConfigsByResolution.get(2);
+                break;
+        }
+        return cameraConfig;
     }
 }
 

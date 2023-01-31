@@ -39,12 +39,6 @@ import java.util.List;
 
 public class RectangleDetector {
 
-    private byte saturate(double val) {
-        int iVal = (int) Math.round(val);
-        iVal = iVal > 255 ? 255 : (Math.max(iVal, 0));
-        return (byte) iVal;
-    }
-
     public Point detectRectangle(Bitmap image, CenterPoint planetCenter) {
         Mat source = new Mat();
         Utils.bitmapToMat(image, source);
@@ -81,6 +75,7 @@ public class RectangleDetector {
         drawContours(blur, contours, -1, new Scalar(255,255,255), -1);
 
         // Morph open
+        //TODO nachprüfen ob 18 nicht zu groß ist
         Mat kernel = getStructuringElement(MORPH_RECT, new Size(18,18));
         Mat opening = new Mat();
 
