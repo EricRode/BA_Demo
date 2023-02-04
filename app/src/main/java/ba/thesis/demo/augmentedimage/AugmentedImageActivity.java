@@ -123,6 +123,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private final SnackbarHelper messageSnackbarHelper = new SnackbarHelper();
     private DisplayRotationHelper displayRotationHelper;
     private final TrackingStateHelper trackingStateHelper = new TrackingStateHelper(this);
+    private boolean found = false;
 
     private enum ImageResolution {
         LOW_RESOLUTION,
@@ -148,7 +149,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     private boolean takePic = false;
 
-    private int scanRythm = 15;
+    private int scanRythm = 10;
 
     // Augmented image configuration and rendering.
     // Load a single image (true) or a pre-generated image database (false).
@@ -162,6 +163,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private int frameNumber = 0;
     private int frameNumberPlaneFound = 0;
     private boolean firstFound = false;
+    private boolean firstFrame = true;
+    private boolean firstTracking = false;
 
     long startTimestamp = 0;
 
@@ -199,9 +202,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         mButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
-                //TODO hier zurücksetzten von Anchor
-
                 takePic();
             }
         });
@@ -304,8 +304,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         displayRotationHelper.onResume();
 
         fitToScanView.setVisibility(View.VISIBLE);
-
-        startTimestamp = System.currentTimeMillis();
     }
 
     @Override
@@ -371,11 +369,26 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             return;
         }
 
+        if (firstFrame) {
+            startTimestamp = System.currentTimeMillis();
+            firstFrame = false;
+        }
+
         if (cpuResolution == ImageResolution.LOW_RESOLUTION && cpuMediumResolutionCameraConfig != null) {
             onCameraConfigChanged(cpuMediumResolutionCameraConfig);
             cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
         }
 
+        if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
+            messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
+
+            if (firstFound && !firstTracking) {
+                writeToFile(-1 + ",", 1, planet);
+            }
+
+            firstFound = true;
+            firstTracking = true;
+        }
 
         // Notify ARCore session that the view size changed so that the perspective matrix and
         // the video background can be properly adjusted.
@@ -438,6 +451,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 if (planetFound && rectangleFound) {
                     planetFound = false;
                     rectangleFound = false;
+                    found = true;
                     messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
                     float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
@@ -451,13 +465,18 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     // hitTest with center of rectangle coordinates
                     handleFoundWord(frame, camera, xD, yD, planet);
 
-                    if (!firstFound) {
+                    if (found && !firstFound) {
                         firstFound = true;
-                        //scanRythm = 60;
-                        writeToFile((System.currentTimeMillis() - startTimestamp) + "");
+                        messageSnackbarHelper.showMessage(this, "Found");
+                        writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
                     }
                 }
 
+                if (wrappedAnchor != null && !firstTracking && found) {
+                    firstTracking = true;
+                    messageSnackbarHelper.showMessage(this, "Tracking");
+                    writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
+                }
 
                 if (wrappedAnchor != null) {
                     drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
@@ -488,6 +507,32 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             }
         }
         return false;
+    }
+    private void writeToFile(String string, int fileName , String planet) {
+        if (string.equals("")) {
+            System.out.println("Text is empty");
+            return;
+        }
+
+        File path = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo");
+        try {
+            path.mkdir();
+            // Write it to disk.
+            File out = null;
+            if (fileName == 0) {
+                out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "Rect_" + planet + "_found.txt");
+            } else {
+                out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "Rect_" + planet + "_tracking.txt");
+            }
+            FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
+            fr.write("\n" + string);
+            fr.close();
+
+        } catch (IOException e) {
+            Log.e("Exception", "File write failed: " + e.toString());
+            System.out.println("Fehler beim schreiben");
+        }
     }
 
     private void writeToFile(String string) {
@@ -646,7 +691,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     // Handle only one tap per frame, as taps are usually low frequency compared to frame rate.
     private void handleFoundWord(Frame frame, Camera camera, float x, float y, String planet) {
-
         if (camera.getTrackingState() == TrackingState.TRACKING) {
             List<HitResult> hitResultList = frame.hitTest(x, y);
             for (HitResult hit : hitResultList) {
