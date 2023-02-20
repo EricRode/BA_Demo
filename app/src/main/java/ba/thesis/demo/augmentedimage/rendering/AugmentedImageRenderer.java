@@ -113,39 +113,39 @@ public class AugmentedImageRenderer {
 
     switch (planet) {
       case "SONNE":
-        sunRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        sunRenderer.updateModelMatrix(modelMatrix, 0.15F);
         sunRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "MERKUR":
-        mercuryRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        mercuryRenderer.updateModelMatrix(modelMatrix, 0.15F);
         mercuryRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "VENUS":
-        venusRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        venusRenderer.updateModelMatrix(modelMatrix, 0.15F);
         venusRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "ERDE":
-        earthRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        earthRenderer.updateModelMatrix(modelMatrix, 0.15F);
         earthRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "MARS":
-        marsRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        marsRenderer.updateModelMatrix(modelMatrix, 0.15F);
         marsRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "JUPITER":
-        jupiterRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        jupiterRenderer.updateModelMatrix(modelMatrix, 0.15F);
         jupiterRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "SATURN":
-        saturnRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        saturnRenderer.updateModelMatrix(modelMatrix, 0.15F);
         saturnRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "URANUS":
-        uranusRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        uranusRenderer.updateModelMatrix(modelMatrix, 0.15F);
         uranusRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "NEPTUN":
-        neptuneRenderer.updateModelMatrix(modelMatrix, 0.1F);
+        neptuneRenderer.updateModelMatrix(modelMatrix, 0.15F);
         neptuneRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
     }

@@ -16,19 +16,17 @@
 
 package ba.thesis.demo.augmentedimage;
 
-import static ba.thesis.demo.augmentedimage.ImageConverter.getBitmap;
-
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.media.Image;
 import android.net.Uri;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.util.Pair;
-import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -57,7 +55,6 @@ import com.google.ar.core.Point;
 import com.google.ar.core.Session;
 import com.google.ar.core.Trackable;
 import com.google.ar.core.TrackingState;
-import ba.thesis.demo.augmentedimage.R;
 
 import ba.thesis.demo.augmentedimage.rendering.AugmentedImageRenderer;
 import ba.thesis.demo.common.helpers.CameraPermissionHelper;
@@ -67,6 +64,7 @@ import ba.thesis.demo.common.helpers.SnackbarHelper;
 import ba.thesis.demo.common.helpers.TrackingStateHelper;
 import ba.thesis.demo.common.rendering.BackgroundRenderer;
 import ba.thesis.demo.common.rendering.PlaneRenderer;
+
 import com.google.ar.core.exceptions.CameraNotAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
@@ -81,7 +79,6 @@ import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 import org.opencv.android.OpenCVLoader;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -91,6 +88,7 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
@@ -148,6 +146,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private boolean shouldConfigureSession = false;
 
     private boolean takePic = false;
+    private AtomicReference<org.opencv.core.Point> result = new AtomicReference<>(new org.opencv.core.Point(-1, -1));
+    private AtomicReference<Boolean> resultAvailable = new AtomicReference<>(false);
 
     private int scanRythm = 10;
 
@@ -161,10 +161,11 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private CenterPoint planetCenter = null;
     private CenterPoint rectangleCenter = null;
     private int frameNumber = 0;
-    private int frameNumberPlaneFound = 0;
     private boolean firstFound = false;
     private boolean firstFrame = true;
     private boolean firstTracking = false;
+
+    private boolean parallelThreadExecuting = false;
 
     long startTimestamp = 0;
 
@@ -218,7 +219,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     public void takePic() {
         firstFound = false;
-        frameNumberPlaneFound = 0;
     }
 
     @Override
@@ -379,7 +379,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
         }
 
-        if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
+        /*if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
             messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
 
             if (firstFound && !firstTracking) {
@@ -388,118 +388,128 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
             firstFound = true;
             firstTracking = true;
-        }
+        }*/
 
         // Notify ARCore session that the view size changed so that the perspective matrix and
         // the video background can be properly adjusted.
         displayRotationHelper.updateSessionIfNeeded(session);
-        synchronized (frameImageInUseLock) {
-            try {
-                session.setCameraTextureName(backgroundRenderer.getTextureId());
-                // Obtain the current frame from ARSession. When the configuration is set to
-                // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
-                // camera framerate.
-                Frame frame = session.update();
-                Camera camera = frame.getCamera();
+        try {
+            session.setCameraTextureName(backgroundRenderer.getTextureId());
+            // Obtain the current frame from ARSession. When the configuration is set to
+            // UpdateMode.BLOCKING (it is by default), this will throttle the rendering to the
+            // camera framerate.
+            Frame frame = session.update();
+            Camera camera = frame.getCamera();
 
-                // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
-                trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
+            // Keep the screen unlocked while tracking, but allow it to lock when tracking stops.
+            trackingStateHelper.updateKeepScreenOnFlag(camera.getTrackingState());
 
-                // If frame is ready, render camera preview image to the GL surface.
-                backgroundRenderer.draw(frame);
+            // If frame is ready, render camera preview image to the GL surface.
+            backgroundRenderer.draw(frame);
 
-                // Get projection matrix.
-                float[] projmtx = new float[16];
-                camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
+            // Get projection matrix.
+            float[] projmtx = new float[16];
+            camera.getProjectionMatrix(projmtx, 0, 0.1f, 100.0f);
 
-                // Get camera matrix and draw.
-                float[] viewmtx = new float[16];
-                camera.getViewMatrix(viewmtx, 0);
+            // Get camera matrix and draw.
+            float[] viewmtx = new float[16];
+            camera.getViewMatrix(viewmtx, 0);
 
-                // Compute lighting from average intensity of the image.
-                final float[] colorCorrectionRgba = new float[4];
-                frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
+            // Compute lighting from average intensity of the image.
+            final float[] colorCorrectionRgba = new float[4];
+            frame.getLightEstimate().getColorCorrection(colorCorrectionRgba, 0);
 
-                if (takePic) {
-                    takePic = false;
+            if (takePic) {
+                takePic = false;
 
-                    // get image from current frame
-                    Image image = frame.acquireCameraImage();
+                // get image from current frame
+                Image image = frame.acquireCameraImage();
 
-                    // get jpeg bitmap from YUV image
-                    currentBitmap = getBitmap(image);
+                // get jpeg bitmap from YUV image
+                currentBitmap = ImageConverter.getBitmap(image);
 
-                    // analyse text in image
-                    runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
+                // analyse text in image
+                runTextRecognition(InputImage.fromBitmap(currentBitmap, 90));
 
-                    image.close();
-                }
+                image.close();
+            }
 
-                // if text was found
-                if (planetFound) {
-                    org.opencv.core.Point pt = new RectangleDetector().detectRectangle(currentBitmap, planetCenter);
-                    messageSnackbarHelper.showMessage(this, "search_rect");
-                    if (pt != null) {
-                        rectangleCenter = new CenterPoint((float) pt.x, (float) pt.y);
-                        rectangleFound = true;
-                    } else {
-                        // In case rectangle was not detected in current image
-                        planetFound = false;
-                    }
-                }
+            // if text was found
+            if (planetFound && !parallelThreadExecuting) {
+                RectangleDetectionTask task = new RectangleDetectionTask();
+                task.execute(new Tuple2(planetCenter, currentBitmap));
+                parallelThreadExecuting = true;
+                messageSnackbarHelper.showMessage(this, "search_rect");
+            }
 
-                if (planetFound && rectangleFound) {
+            if (resultAvailable.get()) {
+                org.opencv.core.Point resultPoint = result.get();
+                resultAvailable.set(false);
+
+                if (resultPoint.x != -1 && resultPoint.y != -1) {
+                    rectangleCenter = new CenterPoint((float) resultPoint.x, (float) resultPoint.y);
+                    rectangleFound = true;
+                } else {
+                    parallelThreadExecuting = false;
                     planetFound = false;
-                    rectangleFound = false;
-                    found = true;
-                    messageSnackbarHelper.showMessage(this, "Planet: " + planet);
+                }
+            }
 
-                    float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
+            if (planetFound && rectangleFound) {
+                planetFound = false;
+                rectangleFound = false;
+                found = true;
+                messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
-                    float x = currentBitmap.getHeight() - rectangleCenter.getY();
-                    float y = rectangleCenter.getX();
+                float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
 
-                    float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
-                    float yD = y * scaleFactor;
+                float x = currentBitmap.getHeight() - rectangleCenter.getY();
+                float y = rectangleCenter.getX();
 
-                    // hitTest with center of rectangle coordinates
-                    handleFoundWord(frame, camera, xD, yD, planet);
+                float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
+                float yD = y * scaleFactor;
 
-                    if (found && !firstFound) {
+                // hitTest with center of rectangle coordinates
+                handleFoundWord(frame, camera, xD, yD, planet);
+
+                scanRythm = 120;
+
+                 /*   if (found && !firstFound) {
                         firstFound = true;
                         messageSnackbarHelper.showMessage(this, "Found");
                         writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
-                    }
-                }
+                    }*/
+            }
 
-                if (wrappedAnchor != null && !firstTracking && found) {
+               /* if (wrappedAnchor != null && !firstTracking && found) {
                     firstTracking = true;
                     messageSnackbarHelper.showMessage(this, "Tracking");
                     writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
-                }
+                }*/
 
-                if (wrappedAnchor != null) {
-                    drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
-                }
+            if (wrappedAnchor != null) {
+                drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
+            }
 
-                // start new scan
-                if ((frameNumber % scanRythm) == 0) {
-                    takePic = true;
-                }
-                frameNumber++;
+            // start new scan
+            if ((frameNumber % scanRythm) == 0) {
+                takePic = true;
+            }
+            frameNumber++;
                 /*if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
                     frameNumberPlaneFound++;
                 }*/
 
-            } catch (Throwable t) {
-                // Avoid crashing the application due to unhandled exceptions.
-                Log.e(TAG, "Exception on the OpenGL thread", t);
-            }
+        } catch (Throwable t) {
+            // Avoid crashing the application due to unhandled exceptions.
+            Log.e(TAG, "Exception on the OpenGL thread", t);
         }
     }
 
 
-    /** Checks if we detected at least one plane. */
+    /**
+     * Checks if we detected at least one plane.
+     */
     private boolean hasTrackingPlane() {
         for (Plane plane : session.getAllTrackables(Plane.class)) {
             if (plane.getTrackingState() == TrackingState.TRACKING) {
@@ -508,7 +518,8 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
         return false;
     }
-    private void writeToFile(String string, int fileName , String planet) {
+
+    private void writeToFile(String string, int fileName, String planet) {
         if (string.equals("")) {
             System.out.println("Text is empty");
             return;
@@ -532,27 +543,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
             System.out.println("Fehler beim schreiben");
-        }
-    }
-
-    private void writeToFile(String string) {
-        if (string.equals("")) {
-            System.out.println("Text is empty");
-            return;
-        }
-
-        File path = new File(Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo");
-        try {
-            path.mkdir();
-            // Write it to disk.
-            File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS) + "/BA_Demo", "Own" + planet + ".txt");
-            FileWriter fr = new FileWriter(out, true); // parameter 'true' is for append mode
-            fr.write("\n" + string);
-            fr.close();
-
-        } catch (IOException e) {
-            Log.e("Exception", "File write failed: " + e.toString());
         }
     }
 
@@ -607,10 +597,10 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     private Tuple processTextRecognitionResult(Text texts) {
         List<Text.TextBlock> blocks = texts.getTextBlocks();
-        if (blocks.size() == 0) {
+        /*if (blocks.size() == 0) {
             messageSnackbarHelper.showMessage(this, "No text found");
             return null;
-        }
+        }*/
 
         boolean signHeadlineFound = false;
         Tuple result = null;
@@ -623,7 +613,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                     signHeadlineFound = true;
                 }
                 for (int k = 0; k < elements.size(); k++) {
-                    for (String planet: planets) {
+                    for (String planet : planets) {
                         if (elements.get(k).getText().contains(planet)) {
                             result = new Tuple(planet, elements.get(k).getBoundingBox());
                             if (signHeadlineFound) {
@@ -643,12 +633,12 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     /**
      * Levenshtein Distance describes number of chars that need to be changed to transform x to y
+     *
      * @param X first word
      * @param Y second word
      * @return Levenshtein Distance
      */
-    public int getLevenshteinDistance(String X, String Y)
-    {
+    public int getLevenshteinDistance(String X, String Y) {
         int m = X.length();
         int n = Y.length();
 
@@ -663,7 +653,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         int cost;
         for (int i = 1; i <= m; i++) {
             for (int j = 1; j <= n; j++) {
-                cost = X.charAt(i - 1) == Y.charAt(j - 1) ? 0: 1;
+                cost = X.charAt(i - 1) == Y.charAt(j - 1) ? 0 : 1;
                 T[i][j] = Integer.min(Integer.min(T[i - 1][j] + 1, T[i][j - 1] + 1),
                         T[i - 1][j - 1] + cost);
             }
@@ -773,6 +763,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                             cameraConfigs, /*ImageResolution*/ ImageResolution.HIGH_RESOLUTION);
         }
     }
+
     /* Get the CameraConfig with selected resolution. */
     private static CameraConfig getCameraConfigWithSelectedResolution(
             List<CameraConfig> cameraConfigs, ImageResolution resolution) {
@@ -798,6 +789,23 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 break;
         }
         return cameraConfig;
+    }
+
+
+    private class RectangleDetectionTask extends AsyncTask<Tuple2, Void, org.opencv.core.Point> {
+        @Override
+        protected org.opencv.core.Point doInBackground(Tuple2... tuple2s) {
+            return new RectangleDetector().detectRectangle(tuple2s[0].getBitmap(), tuple2s[0].getPlanet());
+        }
+
+        @Override
+        protected void onPostExecute(org.opencv.core.Point point) {
+            if (point != null) {
+                result.set(point);
+                resultAvailable.set(true);
+            }
+            parallelThreadExecuting = false;
+        }
     }
 }
 
@@ -848,6 +856,24 @@ final class Tuple {
     }
 }
 
+final class Tuple2 {
+    private final CenterPoint planet;
+    private final Bitmap bitmap;
+
+    Tuple2(CenterPoint planet, Bitmap bitmap) {
+        this.planet = planet;
+        this.bitmap = bitmap;
+    }
+
+    public CenterPoint getPlanet() {
+        return this.planet;
+    }
+
+    public Bitmap getBitmap() {
+        return this.bitmap;
+    }
+}
+
 final class CenterPoint {
     private final float x;
     private final float y;
@@ -874,4 +900,6 @@ final class CenterPoint {
                 '}';
     }
 }
+
+
 
