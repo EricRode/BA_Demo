@@ -461,13 +461,18 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 found = true;
                 messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
-                float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
+                //float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
 
                 float x = currentBitmap.getHeight() - rectangleCenter.getY();
                 float y = rectangleCenter.getX();
 
-                float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
-                float yD = y * scaleFactor;
+                float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
+                float xD = (x - leftOverflow) * surfaceView.getWidth() / currentBitmap.getHeight();
+
+                float yD = y * (surfaceView.getHeight() / currentBitmap.getWidth());
+
+                //float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
+                //float yD = y * scaleFactor;
 
                 // hitTest with center of rectangle coordinates
                 handleFoundWord(frame, camera, xD, yD, planet);
