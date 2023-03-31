@@ -379,7 +379,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
         }
 
-        /*if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
+        if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
             messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
 
             if (firstFound && !firstTracking) {
@@ -388,8 +388,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
             firstFound = true;
             firstTracking = true;
-        }*/
-
+        }
         // Notify ARCore session that the view size changed so that the perspective matrix and
         // the video background can be properly adjusted.
         displayRotationHelper.updateSessionIfNeeded(session);
@@ -462,35 +461,72 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
                 //float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
+/*
+
+
 
                 float x = currentBitmap.getHeight() - rectangleCenter.getY();
                 float y = rectangleCenter.getX();
 
-                float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
+                float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() * 1.0f / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
                 float xD = (x - leftOverflow) * surfaceView.getWidth() / currentBitmap.getHeight();
 
-                float yD = y * (surfaceView.getHeight() / currentBitmap.getWidth());
+                float yD = y * (surfaceView.getHeight() * 1.0f / currentBitmap.getWidth());
+*/
 
-                //float xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
-                //float yD = y * scaleFactor;
+
+                // calculate x and y value based on screen rotation of 90 degrees
+                float x = currentBitmap.getHeight() - rectangleCenter.getY();
+                float y = rectangleCenter.getX();
+
+                float displayWidth = surfaceView.getWidth() ;
+                float displayHeight = surfaceView.getHeight() ;
+
+                // switch width and height because image is rotated by 90 degrees
+                float imageWidth = currentBitmap.getHeight();
+                float imageHeight = currentBitmap.getWidth();
+
+                float nWidth = imageHeight * (displayWidth / displayHeight);
+                float overflowPerSide = (imageWidth - nWidth) / 2;
+                float xTemp = x - overflowPerSide;
+                float scaledX = xTemp * (displayWidth / nWidth);
+
+                float scaledY = y * (displayHeight / imageHeight);
+
+                //float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() * 1.0f / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
+                //float xD = (x - leftOverflow) * surfaceView.getWidth() / currentBitmap.getHeight();
+
+//                float yD = y * (surfaceView.getHeight() * 1.0f / currentBitmap.getWidth());
+
+
+                //writeToFile(" " + leftOverflow + " " + "="  + " " +currentBitmap.getHeight() + " " + "-"  + " " + currentBitmap.getWidth()  + " " + "/"  + " " +surfaceView.getHeight() + " " + "*"  + " " +surfaceView.getWidth() + ",", 0, "Test");
+
+
+                //writeToFile( xD  + " " + "="  + " " + x  + " " + "-"  + " " + leftOverflow + " " + " " + "*"  + " " + surfaceView.getWidth() + " " + "/" + " " + currentBitmap.getHeight() + ",", 0, "Test");
+
+                writeToFile(scaledX + " " + scaledY + "\n" +  displayWidth + "  " + displayHeight + "  " + imageWidth + "  " + imageHeight + "  " + x + "  " + y + "\n", 0, "Test");
+
+
+                //xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
+                //yD = y * scaleFactor;
+
 
                 // hitTest with center of rectangle coordinates
-                handleFoundWord(frame, camera, xD, yD, planet);
+                handleFoundWord(frame, camera, scaledX, scaledY, planet);
 
                 scanRythm = 120;
 
-                 /*   if (found && !firstFound) {
+                 if (found && !firstFound) {
                         firstFound = true;
                         messageSnackbarHelper.showMessage(this, "Found");
                         writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
-                    }*/
+                    }
             }
-
-               /* if (wrappedAnchor != null && !firstTracking && found) {
+            if (wrappedAnchor != null && !firstTracking && found) {
                     firstTracking = true;
                     messageSnackbarHelper.showMessage(this, "Tracking");
                     writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
-                }*/
+            }
 
             if (wrappedAnchor != null) {
                 drawPlanet(projmtx, viewmtx, colorCorrectionRgba);
@@ -501,10 +537,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 takePic = true;
             }
             frameNumber++;
-                /*if (hasTrackingPlane() || frameNumberPlaneFound > 0) {
-                    frameNumberPlaneFound++;
-                }*/
-
         } catch (Throwable t) {
             // Avoid crashing the application due to unhandled exceptions.
             Log.e(TAG, "Exception on the OpenGL thread", t);
@@ -565,6 +597,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             return;
         }
 
+        fitToScanView.setVisibility(View.GONE);
         augmentedImageRenderer.drawPlanet(
                 viewmtx, projmtx, wrappedAnchor.getAnchor(), colorCorrectionRgba, wrappedAnchor.getPlanetName());
     }
@@ -602,11 +635,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     private Tuple processTextRecognitionResult(Text texts) {
         List<Text.TextBlock> blocks = texts.getTextBlocks();
-        /*if (blocks.size() == 0) {
-            messageSnackbarHelper.showMessage(this, "No text found");
-            return null;
-        }*/
-
         boolean signHeadlineFound = false;
         Tuple result = null;
 
