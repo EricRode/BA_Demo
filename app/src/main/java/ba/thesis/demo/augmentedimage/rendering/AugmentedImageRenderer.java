@@ -107,10 +107,9 @@ public class AugmentedImageRenderer {
 
     Pose anchorPose = centerAnchor.getPose();
 
-    //float mazeScaleFactor = maxImageEdgeSize / mazeEdgeSize; // scale to set Maze to image size
     float[] modelMatrix = new float[16];
 
-    // translation of model x is horizontal, y is depth, z +unten
+    // translation of model x is horizontal, y is depth, z is vertical
     Pose mazeModelLocalOffset = Pose.makeTranslation(0.0f, -0.1f, 0.0f);
     anchorPose.compose(mazeModelLocalOffset).toMatrix(modelMatrix, 0);
 

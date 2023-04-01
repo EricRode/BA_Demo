@@ -468,10 +468,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
                 float scaledY = y * (displayHeight / imageHeight);
 
-                // TODO
-                writeToFile(scaledX + " " + scaledY + "\n" + displayWidth + "  " + displayHeight + "  " + imageWidth + "  " + imageHeight + "  " + x + "  " + y + "\n", 0, "Test");
-
-
                 // hitTest with center of rectangle coordinates
                 handleFoundWord(frame, camera, scaledX, scaledY, planet);
 

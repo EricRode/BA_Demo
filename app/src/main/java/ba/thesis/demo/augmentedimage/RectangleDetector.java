@@ -86,6 +86,7 @@ public class RectangleDetector {
                 Rect rect = Imgproc.boundingRect(c);
 
                 if (rect.contains(new Point(planetCenter.getX(), planetCenter.getY()))) {
+
                     // center of rectangle
                     return new Point(rect.x + ((float) (rect.width) / 2), rect.y + ((float) (rect.height) / 2));
                 }
