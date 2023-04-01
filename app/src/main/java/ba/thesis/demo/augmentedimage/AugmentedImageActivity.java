@@ -26,7 +26,6 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
-import android.util.Pair;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -39,21 +38,7 @@ import com.bumptech.glide.Glide;
 import com.bumptech.glide.RequestManager;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.ar.core.Anchor;
-import com.google.ar.core.ArCoreApk;
-import com.google.ar.core.Camera;
-import com.google.ar.core.CameraConfig;
-import com.google.ar.core.CameraConfigFilter;
-import com.google.ar.core.Config;
-import com.google.ar.core.DepthPoint;
-import com.google.ar.core.Frame;
-import com.google.ar.core.HitResult;
-import com.google.ar.core.InstantPlacementPoint;
-import com.google.ar.core.Plane;
-import com.google.ar.core.Point;
-import com.google.ar.core.Session;
-import com.google.ar.core.Trackable;
-import com.google.ar.core.TrackingState;
+import com.google.ar.core.*;
 
 import ba.thesis.demo.augmentedimage.rendering.AugmentedImageRenderer;
 import ba.thesis.demo.common.helpers.CameraPermissionHelper;
@@ -84,17 +69,15 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 /**
- * This app is an adaption of the Codelab ARCore augmented Images from Google.
- * It also uses some code from the Codelab HelloAR.
+ * This app is an adaption of the codeLab ARCore augmented Images from Google.
+ * It also uses some code from the codeLab HelloAR.
  * It was modified with OpenCV to be able to detect a rectangle in an image obtained from ARCore.
  * It also uses MLKit for OCR to detect texts. The app was developed in a bachelor thesis and is
  * able to recognise a rectangle with including the text in it. It is used to enhance the signs

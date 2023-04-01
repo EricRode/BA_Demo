@@ -17,13 +17,15 @@ package ba.thesis.demo.augmentedimage.rendering;
 
 import android.content.Context;
 import com.google.ar.core.Anchor;
-import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Pose;
 import ba.thesis.demo.common.rendering.ObjectRenderer;
 import ba.thesis.demo.common.rendering.ObjectRenderer.BlendMode;
 import java.io.IOException;
 
-/** Renders an augmented image. */
+/** Renders an augmented image.
+ * This class is adapted from the augmented image codeLab from ARCore.
+ * It loads the models of every planet of the solar system.
+ * */
 public class AugmentedImageRenderer {
   private static final String TAG = "AugmentedImageRenderer";
 
@@ -108,7 +110,8 @@ public class AugmentedImageRenderer {
     //float mazeScaleFactor = maxImageEdgeSize / mazeEdgeSize; // scale to set Maze to image size
     float[] modelMatrix = new float[16];
 
-    Pose mazeModelLocalOffset = Pose.makeTranslation(0.0f, -0.1f, 0.0f); // x ist horitzontal -links +rechts, y ist tiefe -ferner +näher, z vertikal -oben +unten
+    // translation of model x is horizontal, y is depth, z +unten
+    Pose mazeModelLocalOffset = Pose.makeTranslation(0.0f, -0.1f, 0.0f);
     anchorPose.compose(mazeModelLocalOffset).toMatrix(modelMatrix, 0);
 
     switch (planet) {
@@ -125,7 +128,7 @@ public class AugmentedImageRenderer {
         venusRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "ERDE":
-        earthRenderer.updateModelMatrix(modelMatrix, 0.33F);
+        earthRenderer.updateModelMatrix(modelMatrix, 0.3F);
         earthRenderer.draw(viewMatrix, projectionMatrix, colorCorrectionRgba, tintColor);
         break;
       case "MARS":

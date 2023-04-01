@@ -19,25 +19,19 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+/**
+ * Helper class for image conversion.
+ */
 public class ImageConverter {
 
-    public static Bitmap getBitmap(Image image) throws IOException {
+    public static Bitmap getBitmap(Image image) {
         int imageFormat = image.getFormat();
         if (imageFormat == ImageFormat.YUV_420_888) {
             Log.d("ImageFormat", "Image format is YUV_420_888");
         }
         byte[] jpeg = toJpegImage(image);
 
-        Bitmap bitmapImage = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
-
-        //final File out = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + "/HelloAR", "Img" + Long.toHexString(System.currentTimeMillis()) + ".png");
-
-        // Write it to disk. Delete later.
-        //FileOutputStream fos = new FileOutputStream(out);
-        //bitmapImage.compress(Bitmap.CompressFormat.JPEG, 100, fos);
-        //fos.flush();
-        //fos.close();
-        return bitmapImage;
+        return BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
     }
 
     public static byte[] toJpegImage(Image image) {
@@ -56,41 +50,6 @@ public class ImageConverter {
         jpegImage = out.toByteArray();
 
         return jpegImage;
-    }
-
-    public static Bitmap toGrayscale(Bitmap bmpOriginal)
-    {
-        int width, height;
-        height = bmpOriginal.getHeight();
-        width = bmpOriginal.getWidth();
-
-        Bitmap bmpGrayscale = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas c = new Canvas(bmpGrayscale);
-        Paint paint = new Paint();
-        ColorMatrix cm = new ColorMatrix();
-        cm.setSaturation(0);
-        ColorMatrixColorFilter f = new ColorMatrixColorFilter(cm);
-        paint.setColorFilter(f);
-        c.drawBitmap(bmpOriginal, 0, 0, paint);
-        return bmpGrayscale;
-    }
-
-    public static Bitmap JPGtoRGB888(Bitmap img){
-        Bitmap result = null;
-
-        int numPixels = img.getWidth() * img.getHeight();
-        int[] pixels = new int[numPixels];
-
-//        get jpeg pixels, each int is the color value of one pixel
-        img.getPixels(pixels,0,img.getWidth(),0,0,img.getWidth(),img.getHeight());
-
-//        create bitmap in appropriate format
-        result = Bitmap.createBitmap(img.getWidth(),img.getHeight(), Bitmap.Config.ARGB_8888);
-
-//        Set RGB pixels
-        result.setPixels(pixels, 0, result.getWidth(), 0, 0, result.getWidth(), result.getHeight());
-
-        return result;
     }
 
     public static YuvImage toYuvImage(Image image) {
