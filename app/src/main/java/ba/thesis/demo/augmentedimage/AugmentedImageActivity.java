@@ -41,7 +41,6 @@ import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
-import com.google.ar.core.AugmentedImage;
 import com.google.ar.core.Camera;
 import com.google.ar.core.CameraConfig;
 import com.google.ar.core.CameraConfigFilter;
@@ -94,14 +93,16 @@ import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
 /**
- * This app extends the HelloAR Java app to include image tracking functionality.
- *
- * <p>In this example, we assume all images are static or moving slowly with a large occupation of
- * the screen. If the target is actively moving, we recommend to check
- * AugmentedImage.getTrackingMethod() and render only when the tracking method equals to
- * FULL_TRACKING. See details in <a
+ * This app is an adaption of the Codelab ARCore augmented Images from Google.
+ * It also uses some code from the Codelab HelloAR.
+ * It was modified with OpenCV to be able to detect a rectangle in an image obtained from ARCore.
+ * It also uses MLKit for OCR to detect texts. The app was developed in a bachelor thesis and is
+ * able to recognise a rectangle with including the text in it. It is used to enhance the signs
+ * of the "Planetenwanderweg Karlsaue" with augmented reality. This app implements the OpenCV
+ * solution. There is also another project with the augmented images solution.
+ * Follow this link to the ARCore website:
  * href="https://developers.google.com/ar/develop/java/augmented-images/">Recognize and Augment
- * Images</a>.
+ * * Images</a>.
  */
 public class AugmentedImageActivity extends AppCompatActivity implements GLSurfaceView.Renderer {
     private static final String TAG = AugmentedImageActivity.class.getSimpleName();
@@ -115,7 +116,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private WrappedAnchor wrappedAnchor;
 
     private boolean installRequested;
-
 
     private Session session;
     private final SnackbarHelper messageSnackbarHelper = new SnackbarHelper();
@@ -136,44 +136,45 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     private final Object frameImageInUseLock = new Object();
 
     // For Camera Configuration APIs usage.
-    private CameraConfig cpuLowResolutionCameraConfig;
-    private CameraConfig cpuMediumResolutionCameraConfig;
-    private CameraConfig cpuHighResolutionCameraConfig;
+    private CameraConfig cpuLowResolutionCameraConfig, cpuMediumResolutionCameraConfig, cpuHighResolutionCameraConfig;
 
     private final BackgroundRenderer backgroundRenderer = new BackgroundRenderer();
     private final AugmentedImageRenderer augmentedImageRenderer = new AugmentedImageRenderer();
 
     private boolean shouldConfigureSession = false;
 
+    // variable to control scanning process
     private boolean takePic = false;
+
+    // used for synchonization between the treads
     private AtomicReference<org.opencv.core.Point> result = new AtomicReference<>(new org.opencv.core.Point(-1, -1));
     private AtomicReference<Boolean> resultAvailable = new AtomicReference<>(false);
 
     private int scanRythm = 10;
 
-    // Augmented image configuration and rendering.
-    // Load a single image (true) or a pre-generated image database (false).
-    private final boolean useSingleImage = false;
-    // Augmented image and its associated center pose anchor, keyed by index of the augmented image in
-    // the database.
-    private final Map<Integer, Pair<AugmentedImage, Anchor>> augmentedImageMap = new HashMap<>();
-
+    // location of the found planetname
     private CenterPoint planetCenter = null;
+
+    // location of the center of the sign
     private CenterPoint rectangleCenter = null;
     private int frameNumber = 0;
-    private boolean firstFound = false;
+
     private boolean firstFrame = true;
+
+    // checks if sign is seen or tracked the first time in a session. Is used for time measurements.
+    private boolean firstFound = false;
     private boolean firstTracking = false;
 
     private boolean parallelThreadExecuting = false;
 
     long startTimestamp = 0;
 
-    private String text = "";
     private Button mButton;
     private boolean planetFound = false;
     private boolean rectangleFound = false;
     private String planet = "";
+
+    // safes bitmap of current image
     private Bitmap currentBitmap = null;
 
     @Override
@@ -207,18 +208,19 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             }
         });
 
+
         boolean success = OpenCVLoader.initDebug();
         if (success) {
-            System.out.println("SUCCESSFUL INIT");
+            System.out.println("SUCCESSFUL OPENCV INIT");
         } else {
-            System.out.println("Fucking OPENCV NOT WORKING AT ALL");
+            System.out.println("ERROR OPENCV INIT");
         }
 
         installRequested = false;
     }
 
+    // function invoked by the button. Does not have a function in final version.
     public void takePic() {
-        firstFound = false;
     }
 
     @Override
@@ -233,7 +235,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
 
         mButton.setOnClickListener(null);
-
         super.onDestroy();
     }
 
@@ -323,8 +324,11 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
         if (!CameraPermissionHelper.hasCameraPermission(this)) {
+            // If you use this file and import it into the augmented images codelab you have
+            // to add storage permissions in the CameraPermissionHelper when you want to use
+            // Android 13 or higher
             Toast.makeText(
-                    this, "Camera permissions are needed to run this application", Toast.LENGTH_LONG)
+                    this, "Camera and storage permissions are needed to run this application.", Toast.LENGTH_LONG)
                     .show();
             if (!CameraPermissionHelper.shouldShowRequestPermissionRationale(this)) {
                 // Permission denied with checking "Do not ask again".
@@ -383,7 +387,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
 
             if (firstFound && !firstTracking) {
-                writeToFile(-1 + ",", 1, planet);
+                // writeToFile(-1 + ",", 1, planet);
             }
 
             firstFound = true;
@@ -424,7 +428,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 // get image from current frame
                 Image image = frame.acquireCameraImage();
 
-                // get jpeg bitmap from YUV image
+                // convert to jpeg bitmap from YUV image
                 currentBitmap = ImageConverter.getBitmap(image);
 
                 // analyse text in image
@@ -433,7 +437,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 image.close();
             }
 
-            // if text was found
+            // if text was found and no rectangle detection is running
             if (planetFound && !parallelThreadExecuting) {
                 RectangleDetectionTask task = new RectangleDetectionTask();
                 task.execute(new Tuple2(planetCenter, currentBitmap));
@@ -441,6 +445,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 messageSnackbarHelper.showMessage(this, "search_rect");
             }
 
+            // if rectangle was found
             if (resultAvailable.get()) {
                 org.opencv.core.Point resultPoint = result.get();
                 resultAvailable.set(false);
@@ -454,38 +459,25 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 }
             }
 
+            // if planetname and rectangle around were found
             if (planetFound && rectangleFound) {
                 planetFound = false;
                 rectangleFound = false;
                 found = true;
                 messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
-                //float scaleFactor = surfaceView.getHeight() / (float) currentBitmap.getWidth();
-/*
-
-
-
-                float x = currentBitmap.getHeight() - rectangleCenter.getY();
-                float y = rectangleCenter.getX();
-
-                float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() * 1.0f / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
-                float xD = (x - leftOverflow) * surfaceView.getWidth() / currentBitmap.getHeight();
-
-                float yD = y * (surfaceView.getHeight() * 1.0f / currentBitmap.getWidth());
-*/
-
-
                 // calculate x and y value based on screen rotation of 90 degrees
                 float x = currentBitmap.getHeight() - rectangleCenter.getY();
                 float y = rectangleCenter.getX();
-
-                float displayWidth = surfaceView.getWidth() ;
-                float displayHeight = surfaceView.getHeight() ;
 
                 // switch width and height because image is rotated by 90 degrees
                 float imageWidth = currentBitmap.getHeight();
                 float imageHeight = currentBitmap.getWidth();
 
+                float displayWidth = surfaceView.getWidth();
+                float displayHeight = surfaceView.getHeight();
+
+                // calculate coordinates on screen based on cropping of 16:9 format to display format
                 float nWidth = imageHeight * (displayWidth / displayHeight);
                 float overflowPerSide = (imageWidth - nWidth) / 2;
                 float xTemp = x - overflowPerSide;
@@ -493,39 +485,29 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
                 float scaledY = y * (displayHeight / imageHeight);
 
-                //float leftOverflow = (currentBitmap.getHeight() - ((currentBitmap.getWidth() * 1.0f / surfaceView.getHeight() ) * surfaceView.getWidth())) / 2.0f;
-                //float xD = (x - leftOverflow) * surfaceView.getWidth() / currentBitmap.getHeight();
-
-//                float yD = y * (surfaceView.getHeight() * 1.0f / currentBitmap.getWidth());
-
-
-                //writeToFile(" " + leftOverflow + " " + "="  + " " +currentBitmap.getHeight() + " " + "-"  + " " + currentBitmap.getWidth()  + " " + "/"  + " " +surfaceView.getHeight() + " " + "*"  + " " +surfaceView.getWidth() + ",", 0, "Test");
-
-
-                //writeToFile( xD  + " " + "="  + " " + x  + " " + "-"  + " " + leftOverflow + " " + " " + "*"  + " " + surfaceView.getWidth() + " " + "/" + " " + currentBitmap.getHeight() + ",", 0, "Test");
-
-                writeToFile(scaledX + " " + scaledY + "\n" +  displayWidth + "  " + displayHeight + "  " + imageWidth + "  " + imageHeight + "  " + x + "  " + y + "\n", 0, "Test");
-
-
-                //xD = x * scaleFactor - (((scaleFactor * currentBitmap.getHeight()) - surfaceView.getWidth()) / 2);
-                //yD = y * scaleFactor;
+                // TODO
+                writeToFile(scaledX + " " + scaledY + "\n" + displayWidth + "  " + displayHeight + "  " + imageWidth + "  " + imageHeight + "  " + x + "  " + y + "\n", 0, "Test");
 
 
                 // hitTest with center of rectangle coordinates
                 handleFoundWord(frame, camera, scaledX, scaledY, planet);
 
+                // set rhythm to every 4 seconds to increase performance.
+                // Rescanning is usually not necessary.
                 scanRythm = 120;
 
-                 if (found && !firstFound) {
-                        firstFound = true;
-                        messageSnackbarHelper.showMessage(this, "Found");
-                        writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
-                    }
+                if (found && !firstFound) {
+                    firstFound = true;
+                    messageSnackbarHelper.showMessage(this, "Found");
+                    // writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
+                }
             }
+
+            // if planet appears on screen for the first time. Used for time calculation
             if (wrappedAnchor != null && !firstTracking && found) {
-                    firstTracking = true;
-                    messageSnackbarHelper.showMessage(this, "Tracking");
-                    writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
+                firstTracking = true;
+                messageSnackbarHelper.showMessage(this, "Tracking");
+                // writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
             }
 
             if (wrappedAnchor != null) {
@@ -544,18 +526,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     }
 
 
-    /**
-     * Checks if we detected at least one plane.
-     */
-    private boolean hasTrackingPlane() {
-        for (Plane plane : session.getAllTrackables(Plane.class)) {
-            if (plane.getTrackingState() == TrackingState.TRACKING) {
-                return true;
-            }
-        }
-        return false;
-    }
-
+    // function is used for writing the measured times in the corresponding files
     private void writeToFile(String string, int fileName, String planet) {
         if (string.equals("")) {
             System.out.println("Text is empty");
@@ -579,7 +550,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
         } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
-            System.out.println("Fehler beim schreiben");
         }
     }
 
@@ -602,7 +572,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 viewmtx, projmtx, wrappedAnchor.getAnchor(), colorCorrectionRgba, wrappedAnchor.getPlanetName());
     }
 
-    /// Text recognition
+    /**
+     * Optical character recognition
+     */
     private void runTextRecognition(InputImage inputImage) {
         TextRecognizer recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
 
@@ -610,9 +582,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 new OnSuccessListener<Text>() {
                     @Override
                     public void onSuccess(Text texts) {
-                        text = texts.getText();
                         Tuple result = processTextRecognitionResult(texts);
-
                         if (result != null) {
                             // rotate by 90 degrees counterclockwise
                             planetCenter = new CenterPoint(result.getRect().exactCenterY(),
@@ -633,6 +603,13 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         });
     }
 
+    /**
+     * Iterates through the obtained texts and search for the predefined terms. If found return
+     * the coordinates
+     *
+     * @param texts of the OCR
+     * @return location of planetname
+     */
     private Tuple processTextRecognitionResult(Text texts) {
         List<Text.TextBlock> blocks = texts.getTextBlocks();
         boolean signHeadlineFound = false;
@@ -696,7 +673,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     }
 
     /***
-     * returns percentage of Similarity in respective to the Levenshtein Distance
+     * Returns percentage of Similarity in respective to the Levenshtein Distance
      */
     public double findSimilarity(String x, String y) {
         if (x == null || y == null) {
@@ -712,7 +689,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     }
 
 
-    // Handle only one tap per frame, as taps are usually low frequency compared to frame rate.
+    /**
+     * Simulates tap on screen with th given coordinates. Is used for getting an anchor.
+     */
     private void handleFoundWord(Frame frame, Camera camera, float x, float y, String planet) {
         if (camera.getTrackingState() == TrackingState.TRACKING) {
             List<HitResult> hitResultList = frame.hitTest(x, y);
@@ -737,20 +716,12 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                         wrappedAnchor.getAnchor().detach();
                     }
                     wrappedAnchor = new WrappedAnchor(hit.createAnchor(), trackable, planet);
-                    // For devices that support the Depth API, shows a dialog to suggest enabling
-                    // depth-based occlusion. This dialog needs to be spawned on the UI thread.
-                    // this.runOnUiThread(this::showOcclusionDialogIfNeeded);
-
-                    // Hits are sorted by depth. Consider only closest hit on a plane, Oriented Point, or
-                    // Instant Placement Point.
                     break;
                 }
             }
         }
     }
 
-
-    /// Resolution stuff
     private void onCameraConfigChanged(CameraConfig cameraConfig) {
         // To change the AR camera config - first we pause the AR session, set the desired camera
         // config and then resume the AR session.
@@ -758,7 +729,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             // Block here if the image is still being used.
             synchronized (frameImageInUseLock) {
                 session.pause();
-                session.setCameraConfig(cameraConfig);
                 session.setCameraConfig(cameraConfig);
                 try {
                     session.resume();
@@ -770,8 +740,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
     }
 
-    // Obtains the supported camera configs and build the list of radio button one for each camera
-    // config.
+    /**
+     * Obtains the supported camera configs
+     */
     private void obtainCameraConfigs() {
         // First obtain the session handle before getting the list of various camera configs.
         if (session != null) {
@@ -797,7 +768,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
         }
     }
 
-    /* Get the CameraConfig with selected resolution. */
+    /**
+     * Get the CameraConfig with selected resolution.
+     **/
     private static CameraConfig getCameraConfigWithSelectedResolution(
             List<CameraConfig> cameraConfigs, ImageResolution resolution) {
         // Take the first three camera configs, if camera configs size are larger than 3.
@@ -825,6 +798,9 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     }
 
 
+    /**
+     * Asnyc task for the recognition of the rectangle. Calculates its center.
+     **/
     private class RectangleDetectionTask extends AsyncTask<Tuple2, Void, org.opencv.core.Point> {
         @Override
         protected org.opencv.core.Point doInBackground(Tuple2... tuple2s) {
@@ -843,8 +819,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 }
 
 /**
- * Associates an Anchor with the trackable it was attached to. This is used to be able to check
- * whether or not an Anchor originally was attached to an {@link InstantPlacementPoint}.
+ * Associates an Anchor with the trackable and planetName it was attached to.
  */
 class WrappedAnchor {
     private final Anchor anchor;
@@ -870,7 +845,9 @@ class WrappedAnchor {
     }
 }
 
-
+/**
+ * Defines a datastructure that is used to associate a Rectangle to a planetName
+ */
 final class Tuple {
     private final String planet;
     private final Rect rect;
@@ -889,6 +866,10 @@ final class Tuple {
     }
 }
 
+/**
+ * Defines a datastructure that is used to associate a bitmap to a planetName.
+ * Is used in the asynchronous rectangleDetectionTask
+ */
 final class Tuple2 {
     private final CenterPoint planet;
     private final Bitmap bitmap;
@@ -906,6 +887,7 @@ final class Tuple2 {
         return this.bitmap;
     }
 }
+
 
 final class CenterPoint {
     private final float x;
