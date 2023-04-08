@@ -60,8 +60,6 @@ public class ImageConverter {
         int width = image.getWidth();
         int height = image.getHeight();
 
-        // Order of U/V channel guaranteed, read more:
-        // https://developer.android.com/reference/android/graphics/ImageFormat#YUV_420_888
         Image.Plane yPlane = image.getPlanes()[0];
         Image.Plane uPlane = image.getPlanes()[1];
         Image.Plane vPlane = image.getPlanes()[2];
@@ -84,8 +82,6 @@ public class ImageConverter {
             }
         }
 
-        // Copy VU data; NV21 format is expected to have YYYYVU packaging.
-        // The U/V planes are guaranteed to have the same row stride and pixel stride.
         int uvRowStride = uPlane.getRowStride();
         int uvPixelStride = uPlane.getPixelStride();
         int uvWidth = width / 2;
@@ -101,6 +97,6 @@ public class ImageConverter {
             }
         }
         return new YuvImage(
-                nv21, ImageFormat.NV21, width, height, /* strides= */ null);
+                nv21, ImageFormat.NV21, width, height,null);
     }
 }

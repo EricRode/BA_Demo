@@ -1,19 +1,6 @@
 /*
- * Copyright 2018 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
+    Some parts of this file are adapted from the ARCore Augmented Image CodeLab.
+*/
 package ba.thesis.demo.augmentedimage;
 
 import android.graphics.Bitmap;
@@ -89,10 +76,11 @@ import javax.microedition.khronos.opengles.GL10;
  */
 public class AugmentedImageActivity extends AppCompatActivity implements GLSurfaceView.Renderer {
     private static final String TAG = AugmentedImageActivity.class.getSimpleName();
+
+    // all possible planet names
     public static final ArrayList<String> planets = new ArrayList(Arrays.asList("SONNE", "MERKUR",
             "VENUS", "ERDE", "MARS", "JUPITER", "SATURN", "URANUS", "NEPTUN"));
 
-    // Rendering. The Renderers are created here, and initialized when the GL surface is created.
     private GLSurfaceView surfaceView;
     private ImageView fitToScanView;
     private RequestManager glideRequestManager;
@@ -129,19 +117,20 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
     // variable to control scanning process
     private boolean takePic = false;
 
-    // used for synchonization between the treads
+    // used for synchronization between the treads
     private AtomicReference<org.opencv.core.Point> result = new AtomicReference<>(new org.opencv.core.Point(-1, -1));
     private AtomicReference<Boolean> resultAvailable = new AtomicReference<>(false);
 
-    private int scanRythm = 10;
+    private int scanRhythm = 10;
 
-    // location of the found planetname
+    // location of the found planetName
     private CenterPoint planetCenter = null;
 
     // location of the center of the sign
     private CenterPoint rectangleCenter = null;
     private int frameNumber = 0;
 
+    // determines if timestamp must be initialized
     private boolean firstFrame = true;
 
     // checks if sign is seen or tracked the first time in a session. Is used for time measurements.
@@ -204,6 +193,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
     // function invoked by the button. Does not have a function in final version.
     public void takePic() {
+        scanRhythm = 10;
     }
 
     @Override
@@ -361,13 +351,14 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             firstFrame = false;
         }
 
+        // set resolution to medium config
         if (cpuResolution == ImageResolution.LOW_RESOLUTION && cpuMediumResolutionCameraConfig != null) {
             onCameraConfigChanged(cpuMediumResolutionCameraConfig);
             cpuResolution = ImageResolution.MEDIUM_RESOLUTION;
         }
 
         if ((System.currentTimeMillis() - startTimestamp) >= 10000) {
-            messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
+            // messageSnackbarHelper.showMessage(this, "Not found in 10s please restart app.");
 
             if (firstFound && !firstTracking) {
                 // writeToFile(-1 + ",", 1, planet);
@@ -425,7 +416,6 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 RectangleDetectionTask task = new RectangleDetectionTask();
                 task.execute(new Tuple2(planetCenter, currentBitmap));
                 parallelThreadExecuting = true;
-                messageSnackbarHelper.showMessage(this, "search_rect");
             }
 
             // if rectangle was found
@@ -442,12 +432,11 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
                 }
             }
 
-            // if planetname and rectangle around were found
+            // if planetName and rectangle around were found
             if (planetFound && rectangleFound) {
                 planetFound = false;
                 rectangleFound = false;
                 found = true;
-                messageSnackbarHelper.showMessage(this, "Planet: " + planet);
 
                 // calculate x and y value based on screen rotation of 90 degrees
                 float x = currentBitmap.getHeight() - rectangleCenter.getY();
@@ -473,11 +462,10 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
 
                 // set rhythm to every 4 seconds to increase performance.
                 // Rescanning is usually not necessary.
-                scanRythm = 120;
+                scanRhythm = 120;
 
                 if (found && !firstFound) {
                     firstFound = true;
-                    messageSnackbarHelper.showMessage(this, "Found");
                     // writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 0, planet);
                 }
             }
@@ -485,7 +473,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             // if planet appears on screen for the first time. Used for time calculation
             if (wrappedAnchor != null && !firstTracking && found) {
                 firstTracking = true;
-                messageSnackbarHelper.showMessage(this, "Tracking");
+                messageSnackbarHelper.showMessage(this, "Tracking Planet:"  + planet);
                 // writeToFile((System.currentTimeMillis() - startTimestamp) + ",", 1, planet);
             }
 
@@ -494,7 +482,7 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             }
 
             // start new scan
-            if ((frameNumber % scanRythm) == 0) {
+            if ((frameNumber % scanRhythm) == 0) {
                 takePic = true;
             }
             frameNumber++;
@@ -737,13 +725,13 @@ public class AugmentedImageActivity extends AppCompatActivity implements GLSurfa
             // Determine the highest and lowest CPU resolutions.
             cpuLowResolutionCameraConfig =
                     getCameraConfigWithSelectedResolution(
-                            cameraConfigs, /*ImageResolution*/ ImageResolution.LOW_RESOLUTION);
+                            cameraConfigs, ImageResolution.LOW_RESOLUTION);
             cpuMediumResolutionCameraConfig =
                     getCameraConfigWithSelectedResolution(
-                            cameraConfigs, /*ImageResolution*/ ImageResolution.MEDIUM_RESOLUTION);
+                            cameraConfigs, ImageResolution.MEDIUM_RESOLUTION);
             cpuHighResolutionCameraConfig =
                     getCameraConfigWithSelectedResolution(
-                            cameraConfigs, /*ImageResolution*/ ImageResolution.HIGH_RESOLUTION);
+                            cameraConfigs, ImageResolution.HIGH_RESOLUTION);
         }
     }
 
