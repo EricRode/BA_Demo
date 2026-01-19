@@ -17,7 +17,7 @@ The application combines several technologies:
 - Real-time rectangle detection using OpenCV
 - Text recognition using ML Kit OCR
 - AR overlay rendering on detected signs
-- Support for all nine planets: Sonne (Sun), Merkur, Venus, Erde, Mars, Jupiter, Saturn, Uranus, and Neptun
+- Support for nine celestial bodies: Sonne (Sun), Merkur, Venus, Erde, Mars, Jupiter, Saturn, Uranus, and Neptun
 - Configurable camera resolution (low, medium, high)
 - Performance tracking and logging
 
@@ -77,7 +77,7 @@ BA_Demo/
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/EricRode/BA_Demo.git
+   git clone <repository-url>
    cd BA_Demo
    ```
 
